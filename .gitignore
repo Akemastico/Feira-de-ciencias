@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+
+# Model caches
+models/
+cache/
+*.wav
+*.webm
+*.mp3
+*.ogg
+
+# Frontend build
+node_modules/
+dist/
+
+# Logs
+install.log
+_tts_seg_*.wav
