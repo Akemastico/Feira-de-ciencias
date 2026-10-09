@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMO-LLM — Teste de pipeline</title>
+<style>
+  body { margin: 0; background: #111; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; height: 100vh; }
+  h1 { font-size: 1.1rem; color: #9cf; }
+  #status { font-size: 2rem; min-height: 3rem; margin: 1rem 0; }
+  #emocao { font-size: 3rem; margin: 0.5rem 0; }
+  #frase { font-size: 1.3rem; color: #ffd; min-height: 2rem; }
+  #transcricao { font-size: 1rem; color: #888; min-height: 1.5rem; }
+  #btn {
+    font-size: 1.5rem; padding: 1rem 3rem; border: none; border-radius: 2rem;
+    background: #2a7; color: #fff; cursor: pointer; user-select: none; touch-action: none;
+  }
+  #btn.recording { background: #d33; }
+  #erro { color: #f66; min-height: 1.2rem; }
+</style>
+</head>
+<body>
+  <h1>BMO-LLM — teste de pipeline</h1>
+  <div id="status">conectando...</div>
+  <div id="emocao"></div>
+  <div id="frase"></div>
+  <div id="transcricao"></div>
+  <div id="erro"></div>
+  <button id="btn">Segure para falar</button>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const btn = $('btn');
+const SAMPLE_RATE = 24000;
+
+let ws = null;
+let audioCtx = null;
+let stream = null;
+let recorder = null;
+let chunks = [];
+let nextTime = 0;
+let activeSources = [];
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { $('status').textContent = 'pronto — segure para falar'; };
+  ws.onclose = () => { $('status').textContent = 'desconectado'; setTimeout(connect, 2000); };
+  ws.onmessage = (ev) => {
+    if (typeof ev.data === 'string') handleJson(JSON.parse(ev.data));
+    else playChunk(ev.data);
+  };
+}
+
+function handleJson(msg) {
+  switch (msg.type) {
+    case 'transcricao': $('transcricao').textContent = 'ouvi: ' + msg.texto; break;
+    case 'estado': $('status').textContent = msg.estado; break;
+    case 'emocao': $('emocao').textContent = msg.emocao; break;
+    case 'frase': $('frase').textContent = msg.texto; break;
+    case 'audio_meta': nextTime = 0; break;
+    case 'audio_fim': $('status').textContent = 'pronto'; break;
+    case 'parar': stopAll(); break;
+    case 'erro': $('erro').textContent = 'erro: ' + msg.mensagem; $('status').textContent = 'pronto'; break;
+  }
+}
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+  return audioCtx;
+}
+
+function pcmToBuffer(pcm) {
+  const int16 = new Int16Array(pcm);
+  const f32 = new Float32Array(int16.length);
+  for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768;
+  const buf = audioCtx.createBuffer(1, f32.length, SAMPLE_RATE);
+  buf.getChannelData(0).set(f32);
+  return buf;
+}
+
+function playChunk(pcm) {
+  const ctx = ensureAudio();
+  const buf = pcmToBuffer(pcm);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  const now = ctx.currentTime;
+  if (nextTime < now) nextTime = now;
+  src.start(nextTime);
+  activeSources.push(src);
+  nextTime += buf.duration;
+}
+
+function stopAll() {
+  for (const s of activeSources) { try { s.stop(); } catch (e) {} }
+  activeSources = [];
+  nextTime = 0;
+}
+
+async function startRecording() {
+  const ctx = ensureAudio();
+  await ctx.resume();
+  if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  chunks = [];
+  recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+  recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    blob.arrayBuffer().then((buf) => ws.send(buf));
+  };
+  recorder.start();
+  btn.classList.add('recording');
+  $('status').textContent = 'gravando...';
+}
+
+function stopRecording() {
+  if (recorder && recorder.state !== 'inactive') {
+    recorder.stop();
+    btn.classList.remove('recording');
+    $('status').textContent = 'processando...';
+    $('erro').textContent = '';
+    $('frase').textContent = '';
+  }
+}
+
+btn.addEventListener('pointerdown', (e) => { e.preventDefault(); startRecording(); });
+btn.addEventListener('pointerup', () => stopRecording());
+btn.addEventListener('pointerleave', () => stopRecording());
+
+window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat) { e.preventDefault(); startRecording(); } });
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') stopRecording(); });
+
+connect();
+</script>
+</body>
+</html>

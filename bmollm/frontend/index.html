@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMO-LLM</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; color: #eee; font-family: system-ui, sans-serif; }
+  #scene { position: fixed; inset: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 1.5rem; }
+  #top { text-align: center; }
+  #emocao { font-size: 2.4rem; min-height: 3rem; text-shadow: 0 0 12px rgba(126,224,168,.6); }
+  #estado { font-size: .85rem; color: #9ab; min-height: 1.3rem; letter-spacing: .12em; text-transform: uppercase; }
+  #bottom { text-align: center; width: 100%; }
+  #frase { font-size: 1.4rem; min-height: 2.2rem; max-width: 60ch; margin: 0 auto; }
+  #transcricao { font-size: .9rem; color: #789; min-height: 1.3rem; }
+  #erro { color: #f88; min-height: 1.2rem; }
+  #btn {
+    pointer-events: auto; margin-top: 1rem; font-size: 1.3rem; padding: .9rem 2.6rem;
+    border: 2px solid #7ee0a8; border-radius: 2rem; background: rgba(126,224,168,.12); color: #7ee0a8;
+    cursor: pointer; user-select: none; touch-action: none;
+  }
+  #btn.recording { background: #e05555; border-color: #e05555; color: #fff; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+</head>
+<body>
+  <div id="scene"></div>
+  <div id="hud">
+    <div id="top">
+      <div id="emocao"></div>
+      <div id="estado">conectando…</div>
+    </div>
+    <div id="bottom">
+      <div id="frase"></div>
+      <div id="transcricao"></div>
+      <div id="erro"></div>
+      <button id="btn">Segure para falar</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
