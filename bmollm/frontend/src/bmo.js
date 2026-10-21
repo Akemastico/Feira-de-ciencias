@@ -6,6 +6,9 @@ const EMOTIONS = ['neutro', 'feliz', 'triste', 'surpreso', 'curioso', 'bravo'];
 export class Bmo {
   constructor() {
     this.group = new THREE.Group();
+    // Peças feitas por código. Ficam escondidas quando o bmo.glb carrega.
+    this.procedural = new THREE.Group();
+    this.group.add(this.procedural);
     this.emotion = 'neutro';
     this.state = 'pronto';
     this._t = 0;
@@ -42,7 +45,7 @@ export class Bmo {
     );
     b3.position.set(-0.51, 0.42, 0.15);
 
-    this.group.add(this.body, this.screen, this.face, b1, b2, b3);
+    this.procedural.add(this.body, this.screen, this.face, b1, b2, b3);
   }
 
   _tryLoadGlb() {
@@ -59,10 +62,9 @@ export class Bmo {
         const center = box.getCenter(new THREE.Vector3());
         model.position.sub(center.multiplyScalar(s));
         model.position.y += 0.2;
-        if (this.body) {
-          this.group.remove(this.body);
-          this.body = null;
-        }
+        // O GLB já tem corpo, tela, botões e rosto: some com o procedural
+        // inteiro para não ficarem duas caras sobrepostas.
+        this.procedural.visible = false;
         this.group.add(model);
       },
       undefined,
@@ -81,7 +83,7 @@ export class Bmo {
   update(dt, mouthOpen) {
     this._t += dt;
     const t = this._t;
-    this._drawFace(mouthOpen);
+    if (this.procedural.visible) this._drawFace(mouthOpen);
     this._applyBody(t);
   }
 
