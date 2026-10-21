@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import tempfile
 import threading
@@ -46,11 +47,18 @@ class BmoPipeline:
     o servidor continua de pé e o problema aparece em /health.
     """
 
+    # Quantas trocas recentes o BMO lembra ao responder.
+    HISTORICO_MAX = 3
+
     def __init__(self, stt=None, llm=None, tts=None):
         self._overrides = {"stt": stt, "llm": llm, "tts": tts}
         self._engines = {}
         self._errors = {}
         self._locks = {name: threading.Lock() for name in _ENGINE_NAMES}
+        # Lista de (pergunta_do_usuario, resposta_do_bmo). Por instância do
+        # pipeline — com vários clientes ao mesmo tempo, as conversas se
+        # misturam. Para a feira (uma pessoa por vez) isso é suficiente.
+        self._historico: list[tuple[str, str]] = []
 
     def _build(self, name):
         return {"stt": STTEngine, "llm": LLMEngine, "tts": TTSEngine}[name]()
@@ -154,7 +162,7 @@ class BmoPipeline:
                 await self._send_json(ws, {"type": "erro", "mensagem": str(exc)})
                 return
 
-            falou = await self._stream_answer(ws, llm, texto)
+            falou = await self._stream_answer(ws, llm, texto, self._montar_prompt(texto))
 
             if not falou:
                 log.warning("Resposta vazia do LLM; usando fallback falado")
@@ -174,7 +182,7 @@ class BmoPipeline:
             # Nunca deixa a interface presa em "pensando".
             await self._send_json(ws, {"type": "estado", "estado": "pronto"})
 
-    async def _stream_answer(self, ws, llm, texto: str) -> bool:
+    async def _stream_answer(self, ws, llm, texto: str, prompt: str | None = None) -> bool:
         parser = ResponseParser()
         splitter = SentenceSplitter()
         emotion_sent = False
@@ -182,7 +190,7 @@ class BmoPipeline:
         falou = False
 
         try:
-            async for chunk, done in llm.generate(texto):
+            async for chunk, done in llm.generate(prompt if prompt is not None else texto):
                 parser.feed(chunk)
 
                 if parser.emotion is not None and not emotion_sent:
@@ -219,7 +227,31 @@ class BmoPipeline:
         if meta_sent:
             await self._send_json(ws, {"type": "audio_fim"})
 
+        resposta = self._extrair_resposta(parser)
+        if resposta:
+            self._historico.append((texto, resposta))
+            if len(self._historico) > self.HISTORICO_MAX:
+                self._historico = self._historico[-self.HISTORICO_MAX:]
+
         return falou
+
+    def _montar_prompt(self, texto: str) -> str:
+        if not self._historico:
+            return texto
+        linhas = ["Histórico recente da conversa:"]
+        for usuario, bmo in self._historico[-self.HISTORICO_MAX:]:
+            linhas.append(f"Usuário: {usuario}")
+            linhas.append(f"BMO: {bmo}")
+        linhas.append("")
+        linhas.append(f"Agora o usuário disse: {texto}")
+        return "\n".join(linhas)
+
+    @staticmethod
+    def _extrair_resposta(parser: ResponseParser) -> str:
+        try:
+            return json.loads(parser.buffer).get("resposta", "").strip()
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return ""
 
     async def _speak(self, ws, sentence: str, meta_sent: bool) -> tuple[bool, bool]:
         """Devolve (audio_meta_já_enviado, tratou_a_frase)."""

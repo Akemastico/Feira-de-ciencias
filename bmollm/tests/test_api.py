@@ -27,7 +27,7 @@ def test_health_sem_ollama_nao_mente():
 def test_pagina_inicial_e_assets_ausentes_nao_quebram():
     with TestClient(app) as client:
         pagina = client.get("/")
-        asset = client.get("/assets/bmo.glb")
+        asset = client.get("/assets/naoexiste.glb")
 
     assert pagina.status_code == 200
     assert "text/html" in pagina.headers["content-type"]

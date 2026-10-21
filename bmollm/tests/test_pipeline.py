@@ -161,3 +161,29 @@ def test_warmup_nao_explode_quando_falta_dependencia():
     asyncio.run(pipeline.warmup())  # não deve levantar
 
     assert pipeline.status()["tts"]["estado"] == "erro"
+
+
+def test_segunda_pergunta_leva_historico_para_o_llm():
+    chunks = [('{"emocao":"feliz","resposta":"Oi!"}', True)]
+    llm = FakeLLM(chunks)
+    pipeline = make_pipeline(stt=FakeSTT("oi"), llm=llm, tts=FakeTTS())
+
+    run(pipeline)
+    run(pipeline)
+
+    assert len(llm.prompts) == 2
+    assert llm.prompts[0] == "oi"
+    assert "Usuário: oi" in llm.prompts[1]
+    assert "BMO: Oi!" in llm.prompts[1]
+    assert "Agora o usuário disse: oi" in llm.prompts[1]
+
+
+def test_historico_limitado_a_tres_trocas():
+    chunks = [('{"emocao":"neutro","resposta":"ok"}', True)]
+    llm = FakeLLM(chunks)
+    pipeline = make_pipeline(stt=FakeSTT("oi"), llm=llm, tts=FakeTTS())
+
+    for _ in range(5):
+        run(pipeline)
+
+    assert len(pipeline._historico) == 3

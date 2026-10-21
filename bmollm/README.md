@@ -55,7 +55,13 @@ python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 Página de teste do pipeline (sem 3D): `http://127.0.0.1:8000/test.html`
 
-## Diagnóstico rápido (`/health`)
+## Memória de conversa
+
+O BMO lembra das **últimas 3 trocas** e usa esse histórico ao responder. Após
+isso, as trocas antigas são descartadas para não estourar o `num_ctx` de 2048
+tokens. O histórico é por instância do servidor — se duas pessoas usarem o bot
+ao mesmo tempo, as conversas se misturam (bom pra feira, onde é uma pessoa por
+vez).
 
 Abra `http://127.0.0.1:8000/health` antes de apresentar. Ele diz o que já está
 pronto e o que falta, sem precisar ler o terminal:
