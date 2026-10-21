@@ -8,6 +8,7 @@ export class AudioManager {
     this._sources = [];
     this._analyser = null;
     this._data = null;
+    this.onError = () => {};
   }
 
   _ensureCtx() {
@@ -23,13 +24,31 @@ export class AudioManager {
   }
 
   async startRecording() {
-    const ctx = this._ensureCtx();
-    if (!this.stream) this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.chunks = [];
-    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
-    this.recorder = mime ? new MediaRecorder(this.stream, { mimeType: mime }) : new MediaRecorder(this.stream);
-    this.recorder.ondataavailable = (e) => { if (e.data.size > 0) this.chunks.push(e.data); };
-    this.recorder.start();
+    try {
+      this._ensureCtx();
+      if (!this.stream) this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.chunks = [];
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+      this.recorder = mime ? new MediaRecorder(this.stream, { mimeType: mime }) : new MediaRecorder(this.stream);
+      this.recorder.ondataavailable = (e) => { if (e.data.size > 0) this.chunks.push(e.data); };
+      this.recorder.start();
+      return true;
+    } catch (err) {
+      console.error('Falha ao gravar:', err);
+      this.onError(this._mensagem(err));
+      return false;
+    }
+  }
+
+  _mensagem(err) {
+    const nome = err && err.name;
+    if (nome === 'NotAllowedError' || nome === 'SecurityError') {
+      return 'Microfone bloqueado. Clique no cadeado do navegador e permita o microfone.';
+    }
+    if (nome === 'NotFoundError' || nome === 'OverconstrainedError') {
+      return 'Nenhum microfone encontrado. Confere se ele está conectado.';
+    }
+    return 'Não consegui usar o microfone: ' + (err && err.message ? err.message : err);
   }
 
   async stopRecording() {

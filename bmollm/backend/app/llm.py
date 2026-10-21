@@ -1,6 +1,12 @@
 import json
+
 import httpx
+
 from .config import settings
+
+
+class LLMError(RuntimeError):
+    """Falha ao falar com o Ollama. A mensagem já está pronta para o usuário."""
 
 
 class LLMEngine:
@@ -26,7 +32,17 @@ class LLMEngine:
             + ". Não inclua raciocínio, tags de pensamento ou markdown."
         )
 
-    async def generate(self, user_text: str):
+    def _timeout(self) -> httpx.Timeout:
+        # read generoso: o Ollama pode levar dezenas de segundos para carregar
+        # o modelo na primeira chamada. O importante é não esperar para sempre.
+        return httpx.Timeout(
+            connect=settings.OLLAMA_TIMEOUT_CONNECT,
+            read=settings.OLLAMA_TIMEOUT_READ,
+            write=10.0,
+            pool=5.0,
+        )
+
+    async def generate(self, user_text: str, max_tokens: int | None = None):
         payload = {
             "model": settings.OLLAMA_MODEL,
             "prompt": user_text,
@@ -37,23 +53,38 @@ class LLMEngine:
             "keep_alive": settings.OLLAMA_KEEP_ALIVE,
             "options": {
                 "num_ctx": settings.OLLAMA_NUM_CTX,
+                "num_predict": (
+                    settings.OLLAMA_NUM_PREDICT if max_tokens is None else max_tokens
+                ),
                 "temperature": 0.7,
             },
         }
-        async with httpx.AsyncClient() as client:
-            async with client.stream("POST", self.url, json=payload, timeout=None) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if data.get("error"):
-                        raise RuntimeError(data["error"])
-                    text = data.get("response", "")
-                    done = bool(data.get("done", False))
-                    yield text, done
-                    if done:
-                        break
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout()) as client:
+                async with client.stream("POST", self.url, json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if data.get("error"):
+                            raise LLMError(
+                                "O Ollama deu um erro. Confere se o modelo está baixado?"
+                            )
+                        text = data.get("response", "")
+                        done = bool(data.get("done", False))
+                        yield text, done
+                        if done:
+                            break
+        except httpx.ConnectError as exc:
+            raise LLMError("Não consegui falar com o Ollama. Ele está aberto?") from exc
+        except httpx.TimeoutException as exc:
+            raise LLMError("Meu cérebro demorou demais pra responder. Tenta de novo?") from exc
+        except httpx.HTTPStatusError as exc:
+            raise LLMError(
+                "O Ollama recusou o pedido. Confere se o modelo está baixado?"
+            ) from exc

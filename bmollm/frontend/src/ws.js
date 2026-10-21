@@ -5,20 +5,30 @@ export class WSClient {
     this.onOpen = onOpen || (() => {});
     this.onClose = onClose || (() => {});
     this.ws = null;
+    this._retry = null;
   }
 
   connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}/ws`);
     this.ws.binaryType = 'arraybuffer';
-    this.ws.onopen = () => this.onOpen();
+    this.ws.onopen = () => {
+      if (this._retry) { clearTimeout(this._retry); this._retry = null; }
+      this.onOpen();
+    };
     this.ws.onmessage = (ev) => {
-      if (typeof ev.data === 'string') this.onJson(JSON.parse(ev.data));
-      else this.onBinary(ev.data);
+      if (typeof ev.data !== 'string') { this.onBinary(ev.data); return; }
+      try {
+        this.onJson(JSON.parse(ev.data));
+      } catch (err) {
+        console.error('Mensagem inválida do servidor:', ev.data, err);
+      }
     };
     this.ws.onclose = () => {
       this.onClose();
-      setTimeout(() => this.connect(), 2000);
+      if (!this._retry) {
+        this._retry = setTimeout(() => { this._retry = null; this.connect(); }, 2000);
+      }
     };
   }
 

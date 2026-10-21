@@ -26,6 +26,11 @@ scene.add(bmo.group);
 
 const ui = new UI();
 const audio = new AudioManager();
+audio.onError = (msg) => {
+  ui.cancelRecording();
+  ui.setErro(msg);
+  ui.setEstado('sem microfone');
+};
 const ws = new WSClient({
   onJson: (msg) => handleJson(msg),
   onBinary: (buf) => audio.playChunk(buf),

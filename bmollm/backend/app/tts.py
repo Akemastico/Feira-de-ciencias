@@ -1,19 +1,25 @@
-import numpy as np
-from kokoro import KPipeline
 from .config import settings
 
 SAMPLE_RATE = 24000
 
 
 class TTSEngine:
-    """Text-to-speech usando Kokoro (pt-BR via espeak-ng)."""
+    """Text-to-speech usando Kokoro (pt-BR via espeak-ng).
+
+    Imports de kokoro/numpy ficam aqui dentro: o servidor sobe sem eles e
+    /health mostra o motivo da falha.
+    """
 
     def __init__(self):
+        from kokoro import KPipeline
+
         self.pipeline = KPipeline(lang_code=settings.KOKORO_LANG)
         self.voice = settings.KOKORO_VOICE
         self.speed = settings.KOKORO_SPEED
 
     def _to_pcm(self, audio) -> bytes:
+        import numpy as np
+
         audio_np = audio.detach().cpu().numpy()
         return (np.clip(audio_np, -1.0, 1.0) * 32767).astype("<i2").tobytes()
 

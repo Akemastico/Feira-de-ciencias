@@ -19,5 +19,6 @@ node_modules/
 dist/
 
 # Logs
+logs/
 install.log
 _tts_seg_*.wav

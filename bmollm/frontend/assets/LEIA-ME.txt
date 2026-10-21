@@ -1,0 +1,4 @@
+Coloque aqui o modelo 3D do BMO (bmo.glb).
+
+Sem o arquivo, o frontend usa o BMO procedural (montado por código) e segue
+funcionando. O backend também não quebra se a pasta estiver vazia.

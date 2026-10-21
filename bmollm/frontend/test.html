@@ -48,7 +48,7 @@ function connect() {
   ws.onopen = () => { $('status').textContent = 'pronto — segure para falar'; };
   ws.onclose = () => { $('status').textContent = 'desconectado'; setTimeout(connect, 2000); };
   ws.onmessage = (ev) => {
-    if (typeof ev.data === 'string') handleJson(JSON.parse(ev.data));
+    if (typeof ev.data === 'string') { try { handleJson(JSON.parse(ev.data)); } catch (e) { console.error(e); } }
     else playChunk(ev.data);
   };
 }
@@ -100,19 +100,29 @@ function stopAll() {
 }
 
 async function startRecording() {
-  const ctx = ensureAudio();
-  await ctx.resume();
-  if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  chunks = [];
-  recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-  recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: 'audio/webm' });
-    blob.arrayBuffer().then((buf) => ws.send(buf));
-  };
-  recorder.start();
-  btn.classList.add('recording');
-  $('status').textContent = 'gravando...';
+  try {
+    const ctx = ensureAudio();
+    await ctx.resume();
+    if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = [];
+    recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      blob.arrayBuffer().then((buf) => ws.send(buf));
+    };
+    recorder.start();
+    btn.classList.add('recording');
+    $('status').textContent = 'gravando...';
+    $('erro').textContent = '';
+  } catch (err) {
+    console.error('Falha ao gravar:', err);
+    btn.classList.remove('recording');
+    $('status').textContent = 'sem microfone';
+    $('erro').textContent = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')
+      ? 'Microfone bloqueado. Permita o microfone no navegador (cadeado na barra de endereço).'
+      : 'Não consegui usar o microfone: ' + (err && err.message ? err.message : err);
+  }
 }
 
 function stopRecording() {

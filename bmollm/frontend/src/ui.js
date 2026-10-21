@@ -25,6 +25,10 @@ export class UI {
     window.addEventListener('keyup', (e) => { if (e.code === 'Space') end(); });
   }
 
+  cancelRecording() {
+    this.btn.classList.remove('recording');
+  }
+
   setEstado(s) { document.getElementById('estado').textContent = s; }
   setFrase(t) { document.getElementById('frase').textContent = t; }
   setTranscript(t) { document.getElementById('transcricao').textContent = t; }
