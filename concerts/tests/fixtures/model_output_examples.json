@@ -1,0 +1,17 @@
+[
+  {
+    "nome": "sem_acoes",
+    "chunks": ["{\"emocao\":\"neutro\",\"resposta\":\"Oi!\"}"],
+    "esperado": []
+  },
+  {
+    "nome": "acoes_antes",
+    "chunks": ["{\"emocao\":\"feliz\",\"acoes\":[{\"nome\":\"animacao\",\"args\":{\"nome\":\"pular\"}}],\"resposta\":\"Oi!\"}"],
+    "esperado": ["animacao"]
+  },
+  {
+    "nome": "acoes_depois",
+    "chunks": ["{\"emocao\":\"neutro\",\"resposta\":\"Oi!\",\"acoes\":[{\"nome\":\"som\",\"args\":{\"tipo\":\"bip\"}}]}"],
+    "esperado": ["som"]
+  }
+]

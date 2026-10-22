@@ -1,0 +1,13 @@
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
+fastapi>=0.115.0,<0.116.0
+uvicorn[standard]>=0.34.0,<0.35.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+httpx>=0.28.0,<0.29.0
+faster-whisper>=1.1.0,<1.2.0
+av>=11,<13
+kokoro>=0.9.4
+soundfile>=0.13.0,<0.14.0
+numpy>=1.26.0,<2.0.0
